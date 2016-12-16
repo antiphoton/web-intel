@@ -59,9 +59,7 @@ var parseSystem = function(systemName, filename) {
     var stargateId, stargateInfo;
     var destination, typeId;
     var systemObj = {};
-    systemObj.center = data['center'][symbolArray].map(parseFloat).map(x => {
-        return x.toExponential();
-    });
+    systemObj.center = data['center'][symbolArray].map(parseFloat);
     if (stargates === '{}') {
     }
     else {
@@ -99,7 +97,7 @@ var readAll = function(rootDir) {
                             systemObj = parseSystem(systemName, path.join(constellationFolder,systemName,'solarsystem.staticdata'));
                             systemObj.constellation = constellationName;
                             systemObj.region = regionName;
-                            systemObj.fullName = regionName + ' > ' + constellationName + ' > ' + systemName;
+                            systemObj.fullName = universeName + ' > ' + regionName + ' > ' + constellationName + ' > ' + systemName;
                             systemLib[systemName] = systemObj;
                         }
                     });
@@ -163,23 +161,14 @@ var analyzeNeighbour = function() {
     }
 };
 var print = function() {
-    var lines = [];
-    lines.push(infoList.length);
-    infoList.forEach(function(info) {
-        lines.push(info.fullName + ' ' + info.center.join(' '));
+    var output = {};
+    output.node = infoList.map(info => {
+        return [info.fullName, info.center];
     });
-    var writePairList = function(pairList) {
-        var n = pairList.length;
-        lines.push(n);
-        var i;
-        for (i=0;i<n;i++) {
-            lines.push(pairList[i][0] + ' ' + pairList[i][1]);
-        }
-    };
-    writePairList(stargateList1);
-    writePairList(stargateList2);
-    writePairList(stargateList3);
-    fs.writeFileSync('data.txt',lines.join('\n'));
+    output.systemGate = stargateList1;
+    output.constellationGate = stargateList2;
+    output.regionGate = stargateList3;
+    fs.writeFileSync('data.txt',JSON.stringify(output,null,' '));
 };
 readAll(path.join(__dirname, 'fsd', 'universe'));
 analyzeNeighbour();

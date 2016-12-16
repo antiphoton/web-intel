@@ -1,0 +1,11 @@
+{
+    "space": null,
+    "region": null,
+    "constellation": null,
+    "system": null,
+    "cutoff": 0,
+    "abstract": true,
+    "scaling": 1e16,
+    "margin": 1e17
+}
+
