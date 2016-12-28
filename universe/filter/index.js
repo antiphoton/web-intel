@@ -144,46 +144,50 @@ var filter = function() {
     var analyzeEdge = function(pairList, pairType) {
         var m = pairList.length;
         var v1, v2;
+        var vs1, vs2;
         var i;
         for (i = 0; i < m; i++) {
             v1 = pairList[i][0];
             v2 = pairList[i][1];
-            if (dictSimplify[v1] < 0 || dictSimplify[v2] < 0) {
+            vs1 = dictSimplify[v1];
+            vs2 = dictSimplify[v2];
+            if (vs1 < 0 || vs2 < 0) {
                 continue;
             }
-            universeOut.edge.push([pairType, v1, v2]);
+            universeOut.edge.push([pairType, vs1, vs2]);
         }
     };
     analyzeEdge(universeIn.systemGate, 0);
     analyzeEdge(universeIn.constellationGate, 1);
     analyzeEdge(universeIn.regionGate, 2);
 };
+var calcEculidDistance = function(p1, p2) {
+    var dx = p1[0] - p2[0];
+    var dy = p1[1] - p2[1];
+    var dz = p1[2] - p2[2];
+    return Math.sqrt(dx * dx + dy * dy + dz * dz);
+};
 var calcBox = function() {
     box = {};
-    var abstractLayout = getArg('abstract');
     var scaling = getArg('scaling');
     var margin = getArg('margin');
     margin /= scaling;
-    var a = universeIn.node;
+    var a = universeOut.node;
+    var b = universeOut.edge;
     var n = a.length;
+    var m = b.length;
     var node;
-    var xlo, xhi, ylo, yhi, zlo, zhi;
-    var x, y, z;
+    var edge, v1, v2;
+    var xlo, xhi, ylo, yhi;
+    var x, y;
     var i;
     for (i = 0; i < n; i++) {
-        if (dictSimplify[i] < 0) {
-            continue;
-        }
-        node = universeIn.node[i];
+        node = a[i];
         node[1] = node[1].map(x => {
             return x / scaling;
         });
-        if (abstractLayout) {
-            node[1][2] = 0;
-        }
         x = node[1][0];
-        y = node[1][1];
-        z = node[1][2];
+        y = node[1][2];
         if (!(xlo < x)) {
             xlo = x;
         }
@@ -196,50 +200,31 @@ var calcBox = function() {
         if (!(yhi > y)) {
             yhi = y;
         }
-        if (!(zlo < z)) {
-            zlo = z;
-        }
-        if (!(zhi > z)) {
-            zhi = z;
-        }
     }
     for (i = 0; i < n; i++) {
-        if (dictSimplify[i] < 0) {
-            continue;
-        }
-        node = universeIn.node[i];
-        node[1][0] += margin - xlo;
-        node[1][1] += margin - ylo;
-        node[1][2] += margin - zlo;
+        node = a[i];
+        node[1][0] = node[1][0] - xlo + margin;
+        node[1][1] = node[1][2] - ylo + margin;
+        node[1][2] = margin;
     }
     box.x = xhi - xlo + margin * 2;
     box.y = yhi - ylo + margin * 2;
-    box.z = zhi - zlo + margin * 2;
-};
-var writeJson = function() {
-    fs.writeFileSync('data.txt', JSON.stringify(universeOut, null, ' '));
-};
-var writeSnapshot = function() {
-    var lines = [];
-    var a = universeIn.node;
-    var n = a.length;
-    var i;
-    var name, center;
-    lines.push(n);
-    lines.push('');
-    for (i = 0; i < n; i++) {
-        if (dictSimplify[i] < 0) {
+    box.z = margin * 2;
+    var totalSystemGateCount = 0;
+    var totalSystemGateLength = 0;
+    for (i = 0; i < m;i++) {
+        edge = b[i];
+        if (edge[0] !== 0) {
             continue;
         }
-        name = a[i][0];
-        center = a[i][1];
-        /^(\S+) > (\S+) > (\S+) > (\S+)/.test(name);
-        lines.push('H  ' + center[0] + ' ' + center[1] + ' ' + center[2]);
+        v1 = edge[1];
+        v2 = edge[2];
+        totalSystemGateCount += 1;
+        totalSystemGateLength += calcEculidDistance(a[v1][1],a[v2][1]);
     }
-    lines.push('');
-    fs.writeFileSync('snapshot.txt', lines.join('\n'));
+    console.log(totalSystemGateLength / totalSystemGateCount);
 };
-var writePhysics = function() {
+var writeLocation = function() {
     var lines = [];
     lines.push(new Date());
     var a = universeOut.node;
@@ -248,34 +233,41 @@ var writePhysics = function() {
     var m = b.length;
     var i;
     var name, center;
-    lines.push(n + ' atoms');
-    lines.push(m + ' bonds');
-    lines.push('1 atom types');
-    lines.push('3 bond types');
+    lines.push(n + n + ' atoms');
+    lines.push(n + m + ' bonds');
+    lines.push('2 atom types');
+    lines.push('4 bond types');
     lines.push([0, box.x, 'xlo', 'xhi'].join(' '));
     lines.push([0, box.y, 'ylo', 'yhi'].join(' '));
     lines.push([0, box.z, 'zlo', 'zhi'].join(' '));
+    lines.push('');
+    lines.push('Masses');
+    lines.push('');
+    lines.push('1 1');
+    lines.push('2 ' + getArg('mass'));
     lines.push('');
     lines.push('Atoms');
     lines.push('');
     for (i = 0; i < n; i++) {
         name = a[i][0];
         center = a[i][1];
-        lines.push([i + 1, 1, center[0], center[1], center[2]].join(' '));
+        lines.push([i * 2 + 1, 1, 1, center[0], center[1], center[2]].join(' '));
+        lines.push([i * 2 + 2, 2, 2, center[0], center[1], center[2]].join(' '));
     }
     lines.push('');
     lines.push('Bonds');
     lines.push('');
+    for (i = 0; i < n; i++) {
+        lines.push([i + 1, 1, i * 2 + 1, i * 2 + 2].join(' '));
+    }
     for (i = 0; i < m; i++) {
-        lines.push([i+1, b[i][0]+1, b[i][1], b[i][2]].join(' '));
+        lines.push([n + i + 1, b[i][0] + 2, b[i][1] * 2 + 2, b[i][2] * 2 + 2].join(' '));
     }
     lines.push('');
-    fs.writeFileSync('physics.txt', lines.join('\n'));
+    fs.writeFileSync(path.join(__dirname,'data.txt'), lines.join('\n'));
 };
 var write = function() {
-    writeJson();
-    writeSnapshot();
-    writePhysics();
+    writeLocation();
 };
 markNodes();
 buildDict();

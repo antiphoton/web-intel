@@ -17,6 +17,10 @@ app.use('/', express.static(clientPath));
 app.get('/', (req, res, next) => {
     res.render(path.join(clientPath, 'index.pug'));
 });
+app.get('*.html', (req, res, next) => {
+    var p = req['path'];
+    next();
+});
 var server = http.Server(app);
 var io = socketIo(server);
 var connectionListener;
