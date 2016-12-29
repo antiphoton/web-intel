@@ -251,8 +251,8 @@ var writeLocation = function() {
     for (i = 0; i < n; i++) {
         name = a[i][0];
         center = a[i][1];
-        lines.push([i * 2 + 1, 1, 1, center[0], center[1], center[2]].join(' '));
-        lines.push([i * 2 + 2, 2, 2, center[0], center[1], center[2]].join(' '));
+        lines.push([i * 2 + 1, 1, 1, 1, center[0], center[1], center[2]].join(' '));
+        lines.push([i * 2 + 2, 1, 2, 1, center[0], center[1], center[2]].join(' '));
     }
     lines.push('');
     lines.push('Bonds');
@@ -266,8 +266,15 @@ var writeLocation = function() {
     lines.push('');
     fs.writeFileSync(path.join(__dirname,'data.txt'), lines.join('\n'));
 };
+var writeNames = function() {
+    var a = universeOut.node.map(x => {
+        return x[0];
+    });
+    fs.writeFileSync('name.txt', a.join('\n'));
+};
 var write = function() {
     writeLocation();
+    writeNames();
 };
 markNodes();
 buildDict();

@@ -146,6 +146,16 @@
             );
         }
     };
+    var createFrameController = function() {
+        var div = $('<input/>')['appendTo']($('body'));
+        div['attr']('type', 'range');
+        div['attr']('min', 0);
+        div['attr']('max', nFrame - 1);
+        div['on']('change input', function (event) {
+            var iFrame = parseInt(div['val']());
+            seekFrame(iFrame);
+        });
+    };
     (function () {
         var systemNames;
         var dataDidLoad = function() {
@@ -156,7 +166,8 @@
             createStargates();
             createSolarSystems(systemNames);
             addMouseListeners(divAll);
-            seekFrame(trajectory.length - 1);
+            createFrameController();
+            seekFrame(nFrame - 1);
         };
         var n = 3;
         var check = function () {
@@ -252,7 +263,7 @@
                 }
                 else if (line === 'ITEM: ATOMS id type xs ys zs') {
                     for (i = 0; i < n; i++) {
-                        matches = lines[iLine + 1 + i].match(/^(\d+) \d+ ([\d\.]+) ([\d\.]+) [\d\.]+$/);
+                        matches = lines[iLine + 1 + i].match(/^(\d+) \d+ ([-e\d\.]+) ([-e\d\.]+) [-e\d\.]+$/);
                         id = parseFloat(matches[1]) / 2 - 1;
                         x = parseFloat(matches[2]);
                         y = parseFloat(matches[3]);
@@ -267,6 +278,7 @@
             if (snapshot) {
                 trajectory.push(snapshot);
             }
+            nFrame = trajectory.length;
             check();
         });
     })();

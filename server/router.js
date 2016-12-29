@@ -19,7 +19,11 @@ app.get('/', (req, res, next) => {
 });
 app.get('*.html', (req, res, next) => {
     var p = req['path'];
-    next();
+    p = p.split('/').join(path['sep']);
+    p = path['normalize'](p);
+    p = path['join'](__dirname, '..', 'client', p);
+    p = p.replace(/\.html$/, '.pug');
+    res['render'](p, {'pretty': true});
 });
 var server = http.Server(app);
 var io = socketIo(server);
