@@ -32,7 +32,7 @@
             line = svgUniverse['line'](0, 0, 1, 1);
             line['stroke']({
                 'width': STARGATE_WIDTH,
-                'color': colors[edges[i * 3] - 2]
+                'color': colors[edges[i * 3]]
             });
             stargates.push(line);
         }
@@ -151,6 +151,7 @@
         div['attr']('type', 'range');
         div['attr']('min', 0);
         div['attr']('max', nFrame - 1);
+        div['attr']('value', nFrame - 1);
         div['on']('change input', function (event) {
             var iFrame = parseInt(div['val']());
             seekFrame(iFrame);
@@ -186,43 +187,25 @@
         $['get']('trajectory_data/graph.txt', data => {
             var lines = data.split('\n');
             var nLine = lines.length;
-            var iLine;
-            var line;
-            var start = false;
+            var n;
+            var m;
             var matches;
-            var a = [];
-            var nAtom;
-            for (iLine = 0; iLine < nLine; iLine++) {
-                line = lines[iLine];
-                if (line === '') {
-                    continue;
-                }
-                if (!start) {
-                    if (line === 'Bonds') {
-                        start = true;
-                    }
-                    continue;
-                }
-                matches = line.match(/^(\d+) (\d+) (\d+) (\d+)$/);
-                if (!matches) {
-                    break;
-                }
-                if (matches[2] === '1') {
-                    continue;
-                }
-                a.push([
-                    parseInt(matches[2]),
-                    parseInt(matches[3]),
-                    parseInt(matches[4])
-                ]);
-            }
-            var n = a.length;
             var i;
-            edges = new Uint16Array(n * 3);
-            for (i = 0; i < n; i++) {
-                edges[i * 3 + 0] = a[i][0];
-                edges[i * 3 + 1] = a[i][1] / 2 - 1;
-                edges[i * 3 + 2] = a[i][2] / 2 - 1;
+            box = {};
+            matches = lines[0].match(/^(-?[\d\.]+) (-?[\d\.]+)$/);
+            box.xMin = parseFloat(matches[1]);
+            box.xMax = parseFloat(matches[2]);
+            matches = lines[1].match(/^(-?[\d\.]+) (-?[\d\.]+)$/);
+            box.yMin = parseFloat(matches[1]);
+            box.yMax = parseFloat(matches[2]);
+            n = parseInt(lines[2]);
+            m = parseInt(lines[3 + n]);
+            edges = new Uint16Array(m * 3);
+            for (i= 0; i< m; i++) {
+                matches = lines[4 + n + i].match(/^(\d+) (\d+) (\d+)$/);
+                edges[i * 3 + 0] = parseInt(matches[1]);
+                edges[i * 3 + 1] = parseInt(matches[2]);
+                edges[i * 3 + 2] = parseInt(matches[3]);
             }
             check();
         });
@@ -238,45 +221,22 @@
             var id, x, y;
             for (iLine = 0; iLine < nLine; iLine++) {
                 line = lines[iLine];
-                if (line === 'ITEM: TIMESTEP') {
-                    if (snapshot) {
-                        trajectory.push(snapshot);
-                        snapshot = undefined;
+                matches = line.match(/^(\d+) (\d+)$/);
+                if (!matches) {
+                    break;
+                }
+                n = parseInt(matches[2]);
+                snapshot = new Float32Array(n * 2);
+                for (i = 0; i < n; i++) {
+                    if (iLine + 1 + i >= nLine) {
+                        break;
                     }
-                    iLine++;
+                    matches = lines[iLine + 1 + i].match(/^(-?[\d\.]+) (-?[\d\.]+)$/);
+                    snapshot[i * 2 + 0] = parseFloat(matches[1]);
+                    snapshot[i * 2 + 1] = parseFloat(matches[2]);
                 }
-                else if (line === 'ITEM: NUMBER OF ATOMS') {
-                    iLine++;
-                    n = parseInt(lines[iLine]);
-                    snapshot = new Float32Array(nAtom * 2);
-                }
-                else if (line === 'ITEM: BOX BOUNDS pp pp pp') {
-                    iLine++;
-                    matches = lines[iLine].match(/^(-?[\d\.]+) (-?[\d\.]+)$/);
-                    box.xMin = parseFloat(matches[1]);
-                    box.xMax = parseFloat(matches[2]);
-                    iLine++;
-                    matches = lines[iLine].match(/^(-?[\d\.]+) (-?[\d\.]+)$/);
-                    box.yMin = parseFloat(matches[1]);
-                    box.yMax = parseFloat(matches[2]);
-                    iLine++;
-                }
-                else if (line === 'ITEM: ATOMS id type xs ys zs') {
-                    for (i = 0; i < n; i++) {
-                        matches = lines[iLine + 1 + i].match(/^(\d+) \d+ ([-e\d\.]+) ([-e\d\.]+) [-e\d\.]+$/);
-                        id = parseFloat(matches[1]) / 2 - 1;
-                        x = parseFloat(matches[2]);
-                        y = parseFloat(matches[3]);
-                        x = box.xMin + (box.xMax - box.xMin) * x;
-                        y = box.yMax - (box.yMax - box.yMin) * y;
-                        snapshot[id * 2 + 0] = x;
-                        snapshot[id * 2 + 1] = y;
-                    }
-                    iLine += n;
-                }
-            }
-            if (snapshot) {
                 trajectory.push(snapshot);
+                iLine += n;
             }
             nFrame = trajectory.length;
             check();

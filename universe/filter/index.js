@@ -226,42 +226,23 @@ var calcBox = function() {
 };
 var writeLocation = function() {
     var lines = [];
-    lines.push(new Date());
     var a = universeOut.node;
     var b = universeOut.edge;
     var n = a.length;
     var m = b.length;
     var i;
     var name, center;
-    lines.push(n + n + ' atoms');
-    lines.push(n + m + ' bonds');
-    lines.push('2 atom types');
-    lines.push('4 bond types');
-    lines.push([0, box.x, 'xlo', 'xhi'].join(' '));
-    lines.push([0, box.y, 'ylo', 'yhi'].join(' '));
-    lines.push([0, box.z, 'zlo', 'zhi'].join(' '));
-    lines.push('');
-    lines.push('Masses');
-    lines.push('');
-    lines.push('1 1');
-    lines.push('2 ' + getArg('mass'));
-    lines.push('');
-    lines.push('Atoms');
-    lines.push('');
+    lines.push([0, box.x].join(' '));
+    lines.push([0, box.y].join(' '));
+    lines.push(n);
     for (i = 0; i < n; i++) {
         name = a[i][0];
         center = a[i][1];
-        lines.push([i * 2 + 1, 1, 1, 1, center[0], center[1], center[2]].join(' '));
-        lines.push([i * 2 + 2, 1, 2, 1, center[0], center[1], center[2]].join(' '));
+        lines.push([center[0], center[1]].join(' '));
     }
-    lines.push('');
-    lines.push('Bonds');
-    lines.push('');
-    for (i = 0; i < n; i++) {
-        lines.push([i + 1, 1, i * 2 + 1, i * 2 + 2].join(' '));
-    }
+    lines.push(m);
     for (i = 0; i < m; i++) {
-        lines.push([n + i + 1, b[i][0] + 2, b[i][1] * 2 + 2, b[i][2] * 2 + 2].join(' '));
+        lines.push(b[i].join(' '));
     }
     lines.push('');
     fs.writeFileSync(path.join(__dirname,'data.txt'), lines.join('\n'));
