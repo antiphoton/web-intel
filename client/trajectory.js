@@ -159,6 +159,16 @@
     };
     (function () {
         var systemNames;
+        var revertVertically = function() {
+            var i, j;
+            var a;
+            for (i = 0; i < nFrame; i++) {
+                a = trajectory[i];
+                for (j = 1; j < a.length; j += 2) {
+                    a[j] = box.yMax - box.yMin - a[j];
+                }
+            }
+        };
         var dataDidLoad = function() {
             var divAll = $('<div/>')['appendTo']($('body'));
             divAll['attr']('id', 'svgWindow');
@@ -168,6 +178,7 @@
             createSolarSystems(systemNames);
             addMouseListeners(divAll);
             createFrameController();
+            revertVertically();
             seekFrame(nFrame - 1);
         };
         var n = 3;

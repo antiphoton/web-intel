@@ -14,9 +14,6 @@ app.use(sessionMiddleware);
 app.set('view engine', 'pug');
 var clientPath=path.join(__dirname, '..', 'client');
 app.use('/', express.static(clientPath));
-app.get('/', (req, res, next) => {
-    res.render(path.join(clientPath, 'index.pug'));
-});
 app.get('*.html', (req, res, next) => {
     var p = req['path'];
     p = p.split('/').join(path['sep']);

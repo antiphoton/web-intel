@@ -2,6 +2,10 @@
 #include<mpi.h>
 #include<sys/ipc.h>
 #include<sys/shm.h>
+#include<algorithm>
+#include<string>
+#include<vector>
+using namespace std;
 #define for if (0) ; else for
 const double TIMESTEP = 0.01;
 struct Point {
@@ -13,6 +17,29 @@ struct Point {
     void copy(const Point &that) {
         x = that.x;
         y = that.y;
+    }
+};
+class NameList {
+    public:
+    vector<string> a;
+    int n;
+    int *p;
+    NameList(int total):n(0) {
+        p = new int[total];
+    }
+    ~NameList() {
+        delete[] p;
+    }
+    void push(const char *s) {
+        int i = find(a.cbegin(), a.cend(), s) - a.cbegin();
+        if ((unsigned int)i == a.size()) {
+            a.push_back(s);
+        }
+        p[n] = i;
+        n++;
+    }
+    int operator [] (int i) {
+        return p[i];
     }
 };
 int mpiSize, mpiRank;
@@ -31,16 +58,17 @@ namespace Star {
     Point *previousLocation;
     Point *location;
     double *forceX, *forceY;
-    int * head;
+    int *head;
+    NameList *spaceId, *regionId, *constellationId, *systemId;
 };
 namespace Gate {
     int m;
-    int * level;
-    int * endpoint1;
-    int * endpoint2;
+    int *level;
+    int *endpoint1;
+    int *endpoint2;
     int offset;
-    int * dest;
-    int * next;
+    int *dest;
+    int *next;
 };
 void addEdge (int s, int t) {
     Gate::dest[Gate::offset] = t;
@@ -105,6 +133,45 @@ void readUniverse (const char *filename) {
         addEdge(b, a);
     }
 }
+void readName (const char *filename) {
+    FILE * f = 0;
+    Star::spaceId = new NameList(Star::n);
+    Star::regionId = new NameList(Star::n);
+    Star::constellationId = new NameList(Star::n);
+    Star::systemId = new NameList(Star::n);
+    if (mpiRank == 0) {
+        f = fopen(filename, "r");
+        for (int i = 0; i < Star::n; i++) {
+            const int L = 20;
+            static char spaceName[L], regionName[L], constellationName[L], systemName[L];
+            fscanf(f, "%s%*s%s%*s%s%*s%s", spaceName, regionName, constellationName, systemName);
+            Star::spaceId -> push(spaceName);
+            Star::regionId -> push(regionName);
+            Star::constellationId -> push(constellationName);
+            Star::systemId -> push(systemName);
+        }
+    }
+    MPI_Bcast(Star::spaceId -> p, Star::n, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(Star::regionId -> p, Star::n, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(Star::constellationId -> p, Star::n, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(Star::systemId -> p, Star::n, MPI_INT, 0, MPI_COMM_WORLD);
+}
+inline int getDiffType (int v1, int v2) {
+    int diffType;
+    if ((*Star::constellationId)[v1] == (*Star::constellationId)[v2]) {
+        diffType = 1;
+    }
+    else if ((*Star::regionId)[v1] == (*Star::regionId)[v2]) {
+        diffType = 2;
+    }
+    else if ((*Star::spaceId)[v1] == (*Star::spaceId)[v2]) {
+        diffType = 3;
+    }
+    else {
+        diffType = 4;
+    }
+    return diffType;
+}
 void interact () {
     for (int i = 0; i < Star::n; i++) {
         Star::forceX[i] = 0;
@@ -121,10 +188,20 @@ void interact () {
             double yDel = y2 - y1;
             double rSqr = xDel * xDel + yDel * yDel;
             double r = sqrt(rSqr);
-            if (r <= 1) {//eclusion
-                double f = (1 - r) * (1 - r);
-                fx += f * xDel / r;
-                fy += f * yDel / r;
+            int diffType = getDiffType(i, j);
+            if (diffType == 1) {
+                if (r <= 1) {
+                    double f = (1 - r) * (1 - r);
+                    fx += f * xDel / r;
+                    fy += f * yDel / r;
+                }
+            }
+            else {
+                if (r <= 2) {
+                    double f = (2 - r) * (2 - r);
+                    fx += f * xDel / r;
+                    fy += f * yDel / r;
+                }
             }
             Star::forceX[j] += fx;
             Star::forceY[j] += fy;
@@ -144,6 +221,7 @@ void interact () {
         double yDel = y2 - y1;
         double rSqr = xDel * xDel + yDel * yDel;
         double r = sqrt(rSqr);
+        int diffType = Gate::level[i] + 1;
         if (1) {
             double f = 0;
             switch (Gate::level[i]) {
@@ -165,6 +243,19 @@ void interact () {
             }
             fx += - f * xDel / r;
             fy += - f * yDel / r;
+        }
+        if (diffType == 1) {
+            if (r <= 1.4142) {//orthogonal
+                double c = xDel / r;
+                double s = yDel / r;
+                double m = 4 * s * c * (c * c - s * s);
+                if (r > 1) {
+                    m *= 2 - r * r;
+                }
+                m *= 0.05;
+                fx += + m * s;
+                fy += - m * c;
+            }
         }
         Star::forceX[v2] += fx;
         Star::forceY[v2] += fy;
@@ -238,15 +329,16 @@ int main (int argc, char ** argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &mpiSize);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpiRank);
     readUniverse("../filter/data.txt");
+    readName("../filter/name.txt");
     FILE * f =fopen("./data.txt", "w");
-    const int TOTAL_STEP = 10000;
-    const int OUTPUT_LINES = 100000;
+    const int TOTAL_STEP = 50000;
+    const int OUTPUT_LINES = 10000;
     const int DUMP_EVERY = ceil(1.0 * TOTAL_STEP * Star::n / OUTPUT_LINES);
-    const int THERMAL_EVERY = ceil(1000000000.0 / Star::n / Star::n);
+    const int THERMAL_EVERY = ceil(100000000.0 / Star::n / Star::n);
     for (int t = 0; t < TOTAL_STEP; t++) {
         interact();
         double remaining = 1.0 * (TOTAL_STEP - t) / TOTAL_STEP;
-        fix(0.1 * remaining * remaining);
+        fix(0.1 * remaining);
         integrate();
         if (t % THERMAL_EVERY == 0) {
             printThermal(t);
